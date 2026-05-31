@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SnowSheets</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0e0f11;
+    --surface:   #161719;
+    --surface2:  #1d1f22;
+    --border:    #2a2c30;
+    --border2:   #383b40;
+    --text:      #d4d6db;
+    --muted:     #666b74;
+    --accent:    #5b8af5;
+    --accent-dim:#1e2d4a;
+    --green:     #3ecf6e;
+    --green-dim: #0f2e1c;
+    --red:       #e05c5c;
+    --amber:     #e8a23a;
+    --mono:      'IBM Plex Mono', monospace;
+    --sans:      'IBM Plex Sans', sans-serif;
+    --kw:        #9b84f5;
+    --fn:        #3ecf8e;
+    --str:       #e8a23a;
+    --cmt:       #4a5060;
+    --tbl:       #5b8af5;
+  }
+
+  html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 13px; }
+
+  /* ── LAYOUT ── */
+  .app { display: grid; grid-template-rows: 40px 1fr; height: 100vh; }
+  .topbar { display: flex; align-items: center; gap: 8px; padding: 0 12px; background: var(--surface); border-bottom: 1px solid var(--border); }
+  .main { display: grid; grid-template-columns: 200px 1fr; overflow: hidden; }
+  .sidebar { background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+  .workspace { display: flex; flex-direction: column; overflow: hidden; }
+
+  /* ── TOPBAR ── */
+  .logo { font-family: var(--mono); font-size: 13px; font-weight: 500; color: var(--text); letter-spacing: .04em; margin-right: 8px; }
+  .logo span { color: var(--accent); }
+  .conn-pill { display: flex; align-items: center; gap: 5px; font-size: 11px; padding: 3px 8px; background: var(--green-dim); color: var(--green); border-radius: 4px; border: 1px solid #1a4a2e; font-family: var(--mono); }
+  .conn-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--green); }
+  .spacer { flex: 1; }
+  .tb-btn { display: flex; align-items: center; gap: 5px; padding: 4px 10px; background: transparent; border: 1px solid var(--border2); border-radius: 5px; color: var(--muted); cursor: pointer; font-family: var(--sans); font-size: 12px; transition: all .15s; }
+  .tb-btn:hover { border-color: var(--accent); color: var(--text); }
+  .tb-btn.run { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); font-weight: 500; }
+  .tb-btn.run:hover { background: var(--accent); color: #fff; }
+  .tb-btn kbd { font-size: 10px; opacity: .6; font-family: var(--mono); }
+
+  /* ── TABS ── */
+  .tabs-row { display: flex; align-items: center; background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 8px; gap: 2px; min-height: 34px; overflow-x: auto; scrollbar-width: none; }
+  .tabs-row::-webkit-scrollbar { display: none; }
+  .tab { display: flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 12px; font-family: var(--mono); color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; transition: color .15s; user-select: none; }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab .close-tab { display: none; font-size: 11px; opacity: .5; margin-left: 2px; }
+  .tab:hover .close-tab { display: inline; }
+  .tab .close-tab:hover { opacity: 1; color: var(--red); }
+  .tab-add { padding: 6px 10px; color: var(--muted); cursor: pointer; font-size: 16px; }
+  .tab-add:hover { color: var(--accent); }
+
+  /* ── SIDEBAR ── */
+  .sb-header { padding: 10px 10px 6px; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+  .sb-search { padding: 0 8px 8px; }
+  .sb-search input { width: 100%; padding: 5px 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-family: var(--sans); font-size: 12px; outline: none; }
+  .sb-search input:focus { border-color: var(--accent); }
+  .tree { overflow-y: auto; flex: 1; padding-bottom: 16px; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+  .tree-db { display: flex; align-items: center; gap: 5px; padding: 5px 10px; font-size: 12px; font-weight: 500; color: var(--text); cursor: pointer; }
+  .tree-db:hover { background: var(--surface2); }
+  .tree-schema { display: flex; align-items: center; gap: 5px; padding: 4px 10px 4px 20px; font-size: 11px; color: var(--muted); cursor: pointer; }
+  .tree-schema:hover { color: var(--text); background: var(--surface2); }
+  .tree-table { display: flex; align-items: center; gap: 5px; padding: 3px 10px 3px 32px; font-size: 11px; color: var(--muted); cursor: pointer; }
+  .tree-table:hover { color: var(--accent); background: var(--surface2); }
+  .tree-icon { width: 12px; font-size: 11px; opacity: .6; }
+
+  /* ── EDITOR ── */
+  .editor-wrap { flex: 1; position: relative; overflow: hidden; background: var(--bg); }
+  #editor { width: 100%; height: 100%; padding: 12px 16px; background: transparent; border: none; outline: none; resize: none; font-family: var(--mono); font-size: 13px; line-height: 1.65; color: var(--text); caret-color: var(--accent); scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+
+  /* ── RESIZE HANDLE ── */
+  .handle { height: 5px; background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); cursor: row-resize; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .handle::after { content: ''; display: block; width: 32px; height: 1px; background: var(--border2); }
+
+  /* ── RESULTS ── */
+  .results-pane { display: flex; flex-direction: column; background: var(--surface); overflow: hidden; flex-shrink: 0; }
+  .results-tabs { display: flex; padding: 0 12px; border-bottom: 1px solid var(--border); gap: 2px; }
+  .rtab { padding: 6px 12px; font-size: 11px; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; font-family: var(--mono); }
+  .rtab:hover { color: var(--text); }
+  .rtab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .results-meta { padding: 5px 12px; font-size: 11px; color: var(--muted); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 16px; font-family: var(--mono); }
+  .results-meta .ok { color: var(--green); }
+  .results-meta .err { color: var(--red); }
+  .table-scroll { overflow: auto; flex: 1; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+  table { width: max-content; min-width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 12px; }
+  thead th { position: sticky; top: 0; background: var(--surface2); padding: 6px 16px; text-align: left; font-weight: 500; color: var(--muted); border-bottom: 1px solid var(--border); white-space: nowrap; letter-spacing: .03em; }
+  tbody td { padding: 5px 16px; border-bottom: 1px solid var(--border); color: var(--text); white-space: nowrap; }
+  tbody tr:hover td { background: var(--surface2); }
+  .null-val { color: var(--muted); font-style: italic; }
+  .num-val { color: var(--amber); }
+  .bool-val { color: var(--kw); }
+  .loading-row { padding: 20px 16px; color: var(--muted); font-family: var(--mono); font-size: 12px; }
+
+  /* ── MESSAGES (status panel) ── */
+  .msg-panel { padding: 12px 16px; font-family: var(--mono); font-size: 12px; line-height: 1.7; overflow-y: auto; flex: 1; }
+  .msg-ok   { color: var(--green); }
+  .msg-err  { color: var(--red); white-space: pre-wrap; }
+  .msg-info { color: var(--muted); }
+
+  /* ── SPINNER ── */
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .6s linear infinite; vertical-align: -2px; margin-right: 6px; }
+
+  /* ── CHART PANEL ── */
+  .chart-panel { display: none; flex-direction: column; flex: 1; overflow: hidden; }
+  .chart-controls { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0; flex-wrap: wrap; }
+  .chart-controls label { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+  .chart-controls select { padding: 3px 6px; background: var(--bg); border: 1px solid var(--border2); border-radius: 4px; color: var(--text); font-family: var(--mono); font-size: 11px; outline: none; cursor: pointer; }
+  .chart-controls select:focus { border-color: var(--accent); }
+  .chart-wrap { flex: 1; position: relative; padding: 12px; overflow: hidden; }
+  .chart-empty { padding: 20px 16px; color: var(--muted); font-family: var(--mono); font-size: 12px; }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <span class="logo">Snow<span>Sheets</span></span>
+    <div class="conn-pill" id="conn-pill">
+      <div class="conn-dot"></div>
+      <span id="conn-label">connecting…</span>
+    </div>
+    <div class="spacer"></div>
+    <button class="tb-btn" onclick="exportCSV()">↓ CSV</button>
+    <button class="tb-btn" onclick="saveQuery()">save</button>
+    <button class="tb-btn run" id="run-btn" onclick="runQuery()">▶ run <kbd>⌘↵</kbd></button>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+      <div class="sb-header">schema browser</div>
+      <div class="sb-search"><input type="text" id="tree-search" placeholder="filter…" oninput="filterTree(this.value)" /></div>
+      <div class="tree" id="tree"><div class="loading-row">loading schemas…</div></div>
+    </div>
+
+    <!-- WORKSPACE -->
+    <div class="workspace">
+      <div class="tabs-row" id="tabs-row">
+        <span class="tab-add" onclick="addTab()" title="New worksheet">+</span>
+      </div>
+
+      <!-- EDITOR -->
+      <div class="editor-wrap" id="editor-wrap">
+        <textarea id="editor" spellcheck="false" placeholder="-- write SQL here, then ⌘↵ to run"></textarea>
+      </div>
+
+      <!-- RESIZE HANDLE -->
+      <div class="handle" id="handle"></div>
+
+      <!-- RESULTS -->
+      <div class="results-pane" id="results-pane" style="height:220px;">
+        <div class="results-tabs">
+          <div class="rtab active" onclick="switchRTab('results',this)">results</div>
+          <div class="rtab" onclick="switchRTab('messages',this)">messages</div>
+          <div class="rtab" onclick="switchRTab('chart',this)">chart</div>
+        </div>
+        <div class="results-meta" id="results-meta"><span class="msg-info">no query run yet</span></div>
+        <div id="results-panel" class="table-scroll"><div class="loading-row">—</div></div>
+        <div id="messages-panel" class="msg-panel" style="display:none;"><span class="msg-info">—</span></div>
+        <div id="chart-panel" class="chart-panel">
+          <div class="chart-controls">
+            <label>type</label>
+            <select id="chart-type" onchange="renderChart()">
+              <option value="bar">bar</option>
+              <option value="line">line</option>
+              <option value="scatter">scatter</option>
+              <option value="pie">pie</option>
+              <option value="doughnut">doughnut</option>
+            </select>
+            <label>x axis</label>
+            <select id="chart-x" onchange="renderChart()"></select>
+            <label>y axis</label>
+            <select id="chart-y" onchange="renderChart()"></select>
+          </div>
+          <div class="chart-wrap"><canvas id="chart-canvas"></canvas></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── STATE ──────────────────────────────────────────────────────────────────────
+let tabs = [];
+let activeTab = null;
+let lastResult = null;
+let dragging = false, dragStartY = 0, dragStartH = 0;
+
+// ── TABS ───────────────────────────────────────────────────────────────────────
+function addTab(name, sql) {
+  const id = 'tab_' + Date.now();
+  const label = name || 'worksheet_' + (tabs.length + 1);
+  tabs.push({ id, label, sql: sql || '' });
+  renderTabs();
+  activateTab(id);
+}
+
+function renderTabs() {
+  const row = document.getElementById('tabs-row');
+  row.innerHTML = '';
+  tabs.forEach(t => {
+    const el = document.createElement('span');
+    el.className = 'tab' + (t.id === (activeTab && activeTab.id) ? ' active' : '');
+    el.dataset.id = t.id;
+    el.innerHTML = `${t.label} <span class="close-tab" onclick="closeTab(event,'${t.id}')">✕</span>`;
+    el.onclick = (e) => { if (!e.target.classList.contains('close-tab')) activateTab(t.id); };
+    row.appendChild(el);
+  });
+  const add = document.createElement('span');
+  add.className = 'tab-add';
+  add.textContent = '+';
+  add.title = 'New worksheet';
+  add.onclick = () => addTab();
+  row.appendChild(add);
+}
+
+function activateTab(id) {
+  if (activeTab) activeTab.sql = document.getElementById('editor').value;
+  activeTab = tabs.find(t => t.id === id);
+  if (!activeTab) return;
+  document.getElementById('editor').value = activeTab.sql;
+  renderTabs();
+}
+
+function closeTab(e, id) {
+  e.stopPropagation();
+  tabs = tabs.filter(t => t.id !== id);
+  if (activeTab && activeTab.id === id) {
+    activeTab = null;
+    if (tabs.length) activateTab(tabs[tabs.length - 1].id);
+    else addTab();
+  } else {
+    renderTabs();
+  }
+}
+
+// ── QUERY ──────────────────────────────────────────────────────────────────────
+async function runQuery() {
+  const sql = document.getElementById('editor').value.trim();
+  if (!sql) return;
+
+  const btn = document.getElementById('run-btn');
+  btn.innerHTML = '<span class="spinner"></span> running';
+  btn.disabled = true;
+
+  const meta = document.getElementById('results-meta');
+  meta.innerHTML = '<span class="spinner"></span><span class="msg-info">executing…</span>';
+
+  const t0 = Date.now();
+  try {
+    const res = await fetch('/api/query', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sql })
+    });
+    const data = await res.json();
+    const elapsed = ((Date.now() - t0) / 1000).toFixed(2);
+
+    if (data.error) {
+      meta.innerHTML = `<span class="err">✗ error</span>`;
+      setMessages(`<span class="msg-err">${data.error}</span>`);
+      setResultsTable(null, null);
+      switchToMessages();
+    } else {
+      lastResult = data;
+      const rowWord = data.rows.length === 1 ? 'row' : 'rows';
+      meta.innerHTML = `<span class="ok">✓ ${data.rows.length} ${rowWord}</span><span>${elapsed}s</span>`;
+      setResultsTable(data.columns, data.rows);
+      populateChartSelectors(data.columns);
+      setMessages(`<span class="msg-ok">Query OK — ${data.rows.length} ${rowWord} in ${elapsed}s</span>`);
+      switchToResults();
+    }
+  } catch (err) {
+    meta.innerHTML = `<span class="err">✗ connection error</span>`;
+    setMessages(`<span class="msg-err">${err.message}</span>`);
+    switchToMessages();
+  }
+
+  btn.innerHTML = '▶ run <kbd>⌘↵</kbd>';
+  btn.disabled = false;
+}
+
+function setResultsTable(cols, rows) {
+  const panel = document.getElementById('results-panel');
+  if (!cols || !cols.length) { panel.innerHTML = '<div class="loading-row">—</div>'; return; }
+  let html = '<table><thead><tr>' + cols.map(c => `<th>${c}</th>`).join('') + '</tr></thead><tbody>';
+  rows.forEach(row => {
+    html += '<tr>' + row.map(cell => {
+      if (cell === null || cell === undefined) return `<td class="null-val">null</td>`;
+      if (typeof cell === 'number') return `<td class="num-val">${cell}</td>`;
+      if (typeof cell === 'boolean') return `<td class="bool-val">${cell}</td>`;
+      return `<td>${String(cell).replace(/</g,'&lt;').replace(/>/g,'&gt;')}</td>`;
+    }).join('') + '</tr>';
+  });
+  html += '</tbody></table>';
+  panel.innerHTML = html;
+}
+
+function setMessages(html) {
+  document.getElementById('messages-panel').innerHTML = html;
+}
+
+// ── RESULT TABS ────────────────────────────────────────────────────────────────
+function switchRTab(name, el) {
+  document.querySelectorAll('.rtab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('results-panel').style.display  = name === 'results'  ? '' : 'none';
+  document.getElementById('messages-panel').style.display = name === 'messages' ? '' : 'none';
+  const cp = document.getElementById('chart-panel');
+  cp.style.display = name === 'chart' ? 'flex' : 'none';
+  if (name === 'chart') renderChart();
+}
+function switchToResults()  { document.querySelectorAll('.rtab')[0].click(); }
+function switchToMessages() { document.querySelectorAll('.rtab')[1].click(); }
+
+// ── CHART ──────────────────────────────────────────────────────────────────────
+let chartInstance = null;
+
+function populateChartSelectors(cols) {
+  const numCols = lastResult ? lastResult.columns.filter((c, i) => lastResult.rows.some(r => typeof r[i] === 'number')) : [];
+  const xSel = document.getElementById('chart-x');
+  const ySel = document.getElementById('chart-y');
+  xSel.innerHTML = cols.map(c => `<option value="${c}">${c}</option>`).join('');
+  ySel.innerHTML = cols.map(c => `<option value="${c}">${c}</option>`).join('');
+  // auto-pick: x = first col, y = first numeric col
+  if (cols.length > 1) {
+    xSel.value = cols[0];
+    const firstNum = lastResult.columns.find((c, i) => lastResult.rows.some(r => typeof r[i] === 'number'));
+    if (firstNum) ySel.value = firstNum;
+    else ySel.value = cols[1];
+  }
+}
+
+function renderChart() {
+  if (!lastResult || !lastResult.columns.length) return;
+  const cols   = lastResult.columns;
+  const rows   = lastResult.rows;
+  const xCol   = document.getElementById('chart-x').value;
+  const yCol   = document.getElementById('chart-y').value;
+  const type   = document.getElementById('chart-type').value;
+  const xi     = cols.indexOf(xCol);
+  const yi     = cols.indexOf(yCol);
+  if (xi < 0 || yi < 0) return;
+
+  const labels = rows.map(r => r[xi] === null ? 'null' : String(r[xi]));
+  const values = rows.map(r => r[yi] === null ? 0 : Number(r[yi]));
+
+  const COLORS = [
+    '#5b8af5','#3ecf8e','#e8a23a','#e05c5c','#9b84f5',
+    '#3ecfcf','#cf3e7a','#8ecf3e','#cf8e3e','#3e8ecf'
+  ];
+
+  const isScatter = type === 'scatter';
+  const isPie     = type === 'pie' || type === 'doughnut';
+
+  const dataset = isScatter
+    ? { label: yCol, data: rows.map(r => ({ x: Number(r[xi]), y: Number(r[yi]) })),
+        backgroundColor: COLORS[0] + 'cc', pointRadius: 4 }
+    : isPie
+    ? { data: values, backgroundColor: labels.map((_, i) => COLORS[i % COLORS.length] + 'cc'),
+        borderColor: labels.map((_, i) => COLORS[i % COLORS.length]), borderWidth: 1 }
+    : { label: yCol, data: values,
+        backgroundColor: COLORS[0] + '55', borderColor: COLORS[0],
+        borderWidth: 2, pointRadius: 3, fill: type === 'line' };
+
+  const canvas = document.getElementById('chart-canvas');
+  if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+
+  chartInstance = new Chart(canvas, {
+    type,
+    data: { labels: isScatter ? undefined : labels, datasets: [dataset] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      animation: { duration: 200 },
+      plugins: {
+        legend: { labels: { color: '#666b74', font: { family: "'IBM Plex Mono'" , size: 11 } } },
+        tooltip: { titleFont: { family: "'IBM Plex Mono'" }, bodyFont: { family: "'IBM Plex Mono'" } }
+      },
+      scales: isPie ? {} : {
+        x: { ticks: { color: '#666b74', font: { family: "'IBM Plex Mono'", size: 11 }, maxTicksLimit: 12 },
+             grid: { color: '#2a2c30' } },
+        y: { ticks: { color: '#666b74', font: { family: "'IBM Plex Mono'", size: 11 } },
+             grid: { color: '#2a2c30' } }
+      }
+    }
+  });
+}
+
+// ── EXPORT ────────────────────────────────────────────────────────────────────
+function exportCSV() {
+  if (!lastResult || !lastResult.columns.length) return;
+  const rows = [lastResult.columns, ...lastResult.rows];
+  const csv  = rows.map(r => r.map(c => `"${String(c === null ? '' : c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a    = document.createElement('a');
+  a.href     = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = 'results.csv';
+  a.click();
+}
+
+// ── SAVE QUERY ────────────────────────────────────────────────────────────────
+function saveQuery() {
+  if (!activeTab) return;
+  activeTab.sql = document.getElementById('editor').value;
+  const store = JSON.parse(localStorage.getItem('snowsheet_saved') || '{}');
+  store[activeTab.label] = activeTab.sql;
+  localStorage.setItem('snowsheet_saved', JSON.stringify(store));
+  setMessages(`<span class="msg-ok">Saved "${activeTab.label}" to browser storage.</span>`);
+}
+
+function loadSavedQueries() {
+  const store = JSON.parse(localStorage.getItem('snowsheet_saved') || '{}');
+  Object.entries(store).forEach(([name, sql]) => addTab(name, sql));
+}
+
+// ── SCHEMA TREE ───────────────────────────────────────────────────────────────
+let treeData = {};
+let expanded = {};
+
+async function loadSchemas() {
+  try {
+    const res  = await fetch('/api/schemas');
+    treeData   = await res.json();
+    renderTree();
+    document.getElementById('conn-label').textContent = 'connected';
+    document.getElementById('conn-pill').style.background = 'var(--green-dim)';
+  } catch (e) {
+    document.getElementById('conn-label').textContent = 'error';
+    document.getElementById('conn-pill').style.background = '#2a1010';
+    document.getElementById('tree').innerHTML = '<div class="loading-row" style="color:var(--red)">could not load schemas</div>';
+  }
+}
+
+function renderTree(filter) {
+  const tree = document.getElementById('tree');
+  const f    = (filter || '').toLowerCase();
+  let html   = '';
+  for (const [db, schemas] of Object.entries(treeData)) {
+    const dbKey = db;
+    const dbMatch = db.toLowerCase().includes(f);
+    let schemaHtml = '';
+    if (expanded[dbKey] || f) {
+      for (const [sc, tables] of Object.entries(schemas)) {
+        const scKey = db + '.' + sc;
+        const scMatch = dbMatch || sc.toLowerCase().includes(f);
+        let tableHtml = '';
+        if (expanded[scKey] || f) {
+          tables.filter(t => !f || t.toLowerCase().includes(f) || scMatch).forEach(t => {
+            tableHtml += `<div class="tree-table" onclick="insertTable('${db}','${sc}','${t}')"><span class="tree-icon">⊡</span>${t}</div>`;
+          });
+        }
+        if (!f || scMatch || tableHtml) {
+          const arr = (expanded[scKey] || f) ? '▾' : '▸';
+          schemaHtml += `<div class="tree-schema" onclick="toggleNode('${scKey}')"><span class="tree-icon">${arr}</span>${sc}</div>${tableHtml}`;
+        }
+      }
+    }
+    if (!f || dbMatch || schemaHtml) {
+      const arr = (expanded[dbKey] || f) ? '▾' : '▸';
+      html += `<div class="tree-db" onclick="toggleNode('${dbKey}')"><span class="tree-icon">${arr}</span>${db}</div>${schemaHtml}`;
+    }
+  }
+  tree.innerHTML = html || '<div class="loading-row">no matches</div>';
+}
+
+function toggleNode(key) {
+  expanded[key] = !expanded[key];
+  renderTree(document.getElementById('tree-search').value);
+}
+
+function filterTree(val) { renderTree(val); }
+
+function insertTable(db, sc, table) {
+  const el  = document.getElementById('editor');
+  const ins = `"${db}"."${sc}"."${table}"`;
+  const pos = el.selectionStart;
+  el.value  = el.value.slice(0, pos) + ins + el.value.slice(el.selectionEnd);
+  el.focus();
+}
+
+// ── RESIZE HANDLE ─────────────────────────────────────────────────────────────
+const handle = document.getElementById('handle');
+handle.addEventListener('mousedown', e => {
+  dragging = true;
+  dragStartY = e.clientY;
+  dragStartH = document.getElementById('results-pane').offsetHeight;
+  document.body.style.cursor = 'row-resize';
+  document.body.style.userSelect = 'none';
+});
+document.addEventListener('mousemove', e => {
+  if (!dragging) return;
+  const delta = dragStartY - e.clientY;
+  const newH  = Math.max(80, Math.min(600, dragStartH + delta));
+  document.getElementById('results-pane').style.height = newH + 'px';
+});
+document.addEventListener('mouseup', () => {
+  dragging = false;
+  document.body.style.cursor = '';
+  document.body.style.userSelect = '';
+});
+
+// ── KEYBOARD ──────────────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); runQuery(); }
+});
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  loadSavedQueries();
+  if (!tabs.length) addTab('worksheet_1', '-- write SQL here\nSELECT CURRENT_USER(), CURRENT_WAREHOUSE(), CURRENT_DATABASE();');
+  loadSchemas();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.env
+.venv/
+venv/
+
+# Snowflake / secrets
+*.p8
+*.pem
+*.key
+.env*
+
+# OS
+.DS_Store
+Thumbs.db
